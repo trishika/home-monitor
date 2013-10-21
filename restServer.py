@@ -12,10 +12,11 @@ try:
 	from subprocess import call, Popen, PIPE
 	from traceback import print_exc
 	import threading
+	import json
+	import urllib2
 	import ConfigParser
-	import sys, os
+	import sys, os, time, datetime
 	import sqlite3
-	import datetime
 except ImportError as error:
 	print 'ImportError: ', str(error)
 	exit(1)
@@ -37,8 +38,6 @@ else:
 app = Flask(__name__)
 app.config.from_pyfile(config, silent=True)
 
-print(config)
-
 try:
 	fd = open(app.config["SERVERS"])
 	servers = json.load(fd)
@@ -46,8 +45,15 @@ except:
 	print("Invalid configuration file")
 	exit(1)
 
-db = sqlite3.connect('monitor.db')
 
+def dict_factory(cursor, row):
+	d = {}
+	for idx,col in enumerate(cursor.description):
+		d[col[0]] = row[idx]
+	return d
+
+db = sqlite3.connect('monitor.db')
+db.row_factory = dict_factory
 
 ################### RULES API
 
@@ -65,7 +71,7 @@ def createRulesTable():
 def get_rules():
 	try:
 		c = db.cursor()
-		return json.dumps(c.execute('SELECT * FROM rules'))
+		return json.dumps(c.execute('SELECT * FROM rules').fetchall())
 	except:
 		print_exc()
 		return json.dumps({})
@@ -75,7 +81,7 @@ def get_rules():
 def get_rule(ruleId):
 	try:
 		c = db.cursor()
-		return json.dumps(c.execute('SELECT * FROM rules WHERE id=:id', { "id": ruleId }))
+		return json.dumps(c.execute('SELECT * FROM rules WHERE id=:id', { "id": ruleId }).fetchall())
 	except:
 		print_exc()
 		return json.dumps({})
@@ -85,15 +91,18 @@ def get_rule(ruleId):
 def add_rule():
 	try:
 		c = db.cursor()
-		c.execute('''INSERT INTO rules ( switch_host, switch_id, sensor_host, sensor_id, start_time, stop_time, temp)
-				VALUES (:switch_host, :switch_id, :sensor_host, :sensor_id, :start_time, :stop_time, :temp''',
+		c.execute('''INSERT INTO rules
+					( switch_host,  switch_id,  sensor_host,  sensor_id,  start_time,  end_time,  temp)
+			VALUES  (:switch_host, :switch_id, :sensor_host, :sensor_id, :start_time, :end_time, :temp)''',
 			{"switch_host" : request.form["switch_host"], "switch_id" : request.form["switch_id"],
 			"sensor_host" : request.form["sensor_host"], "sensor_id" : request.form["sensor_id"],
-			"start_time" : request.form['start_time'], "end_time" : request.form['end_time'], "temp" : request.form['temp']})
+			"start_time" : request.form['start_time'], "end_time" : request.form['end_time'],
+			"temp" : request.form['temp']})
+		db.commit()
 	except:
 		print_exc()
 
-	return json.dumps({})
+	return get_rules()
 
 # Del one rule
 @app.route("/rules/<int:ruleId>/", methods = ["DELETE"])
@@ -108,27 +117,5 @@ def del_rule(ruleId):
 
 	return json.dumps({})
 
+# Rest server for monitor configuration
 app.run("0.0.0.0", app.config["PORT"])
-
-def monitor():
-
-	while True:
-
-		switches,sensors = get_nodes(servers)
-
-		c = db.cursor()
-		for rule in c.execute('SELECT * FROM rules'):
-			now = datetime.datetime.now().time()
-			if now > rule["start_time"] and now < rule["end_time"]:
-
-				for sensor in sensors:
-					if sensor['host'] == rule['host']:
-						switch = { 'host' : rule['switch_host'], 'id' : rule['switch_id']}
-						if sensors['value'] < (rule['temp'] - 0.5):
-							set_switch(switch, 1)
-						if sensors['value'] > (rule['temp'] + 0.5):
-							set_switch(switch, 0)
-
-		time.sleep(6*60)
-
-
