@@ -52,7 +52,7 @@ def dict_factory(cursor, row):
 		d[col[0]] = row[idx]
 	return d
 
-db = sqlite3.connect('monitor.db')
+db = sqlite3.connect(app.config['DB'])
 db.row_factory = dict_factory
 
 ################### RULES API

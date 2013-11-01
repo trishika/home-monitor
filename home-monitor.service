@@ -1,0 +1,10 @@
+[Unit]
+Description=Domotique monitor deamon
+
+[Service]
+ExecStart=/usr/local/bin/home-monitor.py /etc/home/rulesRest.cfg
+KillMode=process
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

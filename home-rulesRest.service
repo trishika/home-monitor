@@ -1,0 +1,10 @@
+[Unit]
+Description=Domotique Rules REST server deamon
+
+[Service]
+ExecStart=/usr/local/bin/home-rulesRestServer.py /etc/home/rulesRest.cfg
+KillMode=process
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
