@@ -70,7 +70,9 @@ class Monitor(threading.Thread):
 			for rule in rules:
 				now = datetime.datetime.now().timetuple()
 
-				if int(now[3]) > int(rule["start_time"]) or int(now[3]) < int(rule["end_time"]):
+				test_start = int(now[3]) > int(rule["start_time"])
+				test_end   = int(now[3]) < int(rule["end_time"])
+				if (test_start and test_end) or (int(rule["start_time"])>int(rule["end_time"]) and (test_start or test_end)):
 
 					switch = { 'host' : "http://" + rule['switch_host'], 'id' : rule['switch_id']}
 					sensor = { 'host' : "http://" + rule['sensor_host'], 'id' : rule['sensor_id']}
@@ -83,7 +85,7 @@ class Monitor(threading.Thread):
 						print("Set heater off, current temp is %s, target is %s" % (str(sensor['value']), str(rule['temp'])))
 						set_switch(switch, 0)
 
-			time.sleep(5)
+			time.sleep(60)
 
 # Launch monitor
 monitor = Monitor()
